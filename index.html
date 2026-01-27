@@ -12,6 +12,13 @@
             padding: 20px;
             background-color: #f5f5f5;
         }
+        #setup-container {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            text-align: center;
+        }
         #chat-container {
             background: white;
             border-radius: 8px;
@@ -20,6 +27,7 @@
             height: 400px;
             overflow-y: auto;
             margin-bottom: 20px;
+            display: none;
         }
         .message {
             margin: 10px 0;
@@ -36,17 +44,19 @@
             color: #333;
         }
         #input-container {
-            display: flex;
+            display: none;
             gap: 10px;
         }
-        #user-input {
+        #user-input, #token-input {
             flex: 1;
             padding: 10px;
             border: 1px solid #ddd;
             border-radius: 4px;
             font-size: 14px;
+            width: 100%;
+            box-sizing: border-box;
         }
-        #send-btn {
+        button {
             padding: 10px 20px;
             background-color: #007bff;
             color: white;
@@ -55,10 +65,10 @@
             cursor: pointer;
             font-size: 14px;
         }
-        #send-btn:hover {
+        button:hover {
             background-color: #0056b3;
         }
-        #send-btn:disabled {
+        button:disabled {
             background-color: #ccc;
             cursor: not-allowed;
         }
@@ -66,23 +76,92 @@
             color: #666;
             font-style: italic;
         }
+        .info-box {
+            background-color: #e7f3ff;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 15px 0;
+            text-align: left;
+        }
+        .info-box a {
+            color: #007bff;
+        }
+        #reset-token {
+            background-color: #6c757d;
+            margin-top: 10px;
+            font-size: 12px;
+        }
     </style>
 </head>
 <body>
     <h2>🎓 Tutor Socrático IA</h2>
+    
+    <div id="setup-container">
+        <h3>Configuración inicial</h3>
+        <div class="info-box">
+            <p><strong>Para usar este tutor necesitas un token gratuito de Hugging Face:</strong></p>
+            <ol style="text-align: left;">
+                <li>Ve a <a href="https://huggingface.co/settings/tokens" target="_blank">huggingface.co/settings/tokens</a></li>
+                <li>Crea un token de tipo "Read"</li>
+                <li>Copia el token (empieza con hf_...)</li>
+                <li>Pégalo abajo</li>
+            </ol>
+        </div>
+        <input type="password" id="token-input" placeholder="Pega tu token de Hugging Face aquí (hf_...)">
+        <button id="save-token-btn">Guardar y comenzar</button>
+        <p style="font-size: 12px; color: #666; margin-top: 10px;">Tu token se guarda localmente en tu navegador, no se envía a ningún servidor.</p>
+    </div>
+
     <div id="chat-container"></div>
     <div id="input-container">
         <input type="text" id="user-input" placeholder="Escribe tu pregunta aquí..." />
         <button id="send-btn">Enviar</button>
     </div>
+    <div style="text-align: center;">
+        <button id="reset-token" style="display: none;">Cambiar token</button>
+    </div>
 
     <script>
-        const API_TOKEN = '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'; // REEMPLAZAR EN PASO 4
         const API_URL = 'https://api-inference.huggingface.co/models/mistralai/Mixtral-8x7B-Instruct-v0.1';
         
+        const setupContainer = document.getElementById('setup-container');
         const chatContainer = document.getElementById('chat-container');
+        const inputContainer = document.getElementById('input-container');
         const userInput = document.getElementById('user-input');
         const sendBtn = document.getElementById('send-btn');
+        const tokenInput = document.getElementById('token-input');
+        const saveTokenBtn = document.getElementById('save-token-btn');
+        const resetTokenBtn = document.getElementById('reset-token');
+
+        let API_TOKEN = localStorage.getItem('hf_token');
+
+        function initializeChat() {
+            if (API_TOKEN) {
+                setupContainer.style.display = 'none';
+                chatContainer.style.display = 'block';
+                inputContainer.style.display = 'flex';
+                resetTokenBtn.style.display = 'inline-block';
+                addMessage('¡Hola! Soy tu tutor socrático. Hazme una pregunta y te guiaré a encontrar la respuesta.', false);
+            }
+        }
+
+        saveTokenBtn.addEventListener('click', () => {
+            const token = tokenInput.value.trim();
+            if (token.startsWith('hf_') && token.length > 10) {
+                localStorage.setItem('hf_token', token);
+                API_TOKEN = token;
+                initializeChat();
+            } else {
+                alert('Token inválido. Debe comenzar con "hf_" y tener más de 10 caracteres.');
+            }
+        });
+
+        resetTokenBtn.addEventListener('click', () => {
+            if (confirm('¿Seguro que deseas cambiar el token? Se borrará el chat actual.')) {
+                localStorage.removeItem('hf_token');
+                location.reload();
+            }
+        });
 
         function addMessage(text, isUser) {
             const messageDiv = document.createElement('div');
@@ -139,7 +218,7 @@ Tutor:`;
                 addMessage(response, false);
             } catch (error) {
                 loadingMsg.remove();
-                addMessage(`Error: ${error.message}. Verifica tu token de Hugging Face.`, false);
+                addMessage(`Error: ${error.message}. Verifica tu token o intenta más tarde.`, false);
             }
 
             sendBtn.disabled = false;
@@ -151,8 +230,8 @@ Tutor:`;
             if (e.key === 'Enter') handleSend();
         });
 
-        // Mensaje de bienvenida
-        addMessage('¡Hola! Soy tu tutor socrático. Hazme una pregunta y te guiaré a encontrar la respuesta.', false);
+        // Inicializar si ya existe token guardado
+        initializeChat();
     </script>
 </body>
 </html>
