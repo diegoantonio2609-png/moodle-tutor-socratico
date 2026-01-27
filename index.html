@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tutor Socrático IA</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        #chat-container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            height: 400px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+        }
+        .message {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 6px;
+        }
+        .user-message {
+            background-color: #007bff;
+            color: white;
+            text-align: right;
+        }
+        .bot-message {
+            background-color: #e9ecef;
+            color: #333;
+        }
+        #input-container {
+            display: flex;
+            gap: 10px;
+        }
+        #user-input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        #send-btn {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        #send-btn:hover {
+            background-color: #0056b3;
+        }
+        #send-btn:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .loading {
+            color: #666;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <h2>🎓 Tutor Socrático IA</h2>
+    <div id="chat-container"></div>
+    <div id="input-container">
+        <input type="text" id="user-input" placeholder="Escribe tu pregunta aquí..." />
+        <button id="send-btn">Enviar</button>
+    </div>
+
+    <script>
+        const API_TOKEN = 'TU_TOKEN_AQUI'; // REEMPLAZAR EN PASO 4
+        const API_URL = 'https://api-inference.huggingface.co/models/mistralai/Mixtral-8x7B-Instruct-v0.1';
+        
+        const chatContainer = document.getElementById('chat-container');
+        const userInput = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+
+        function addMessage(text, isUser) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
+            messageDiv.textContent = text;
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        async function queryHuggingFace(userMessage) {
+            const prompt = `Eres un tutor socrático. Tu objetivo es guiar al estudiante a descubrir la respuesta por sí mismo mediante preguntas reflexivas, sin dar respuestas directas. 
+
+Estudiante: ${userMessage}
+Tutor:`;
+
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${API_TOKEN}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    inputs: prompt,
+                    parameters: {
+                        max_new_tokens: 200,
+                        temperature: 0.7,
+                        return_full_text: false
+                    }
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`Error HTTP: ${response.status}`);
+            }
+
+            const data = await response.json();
+            return data[0].generated_text.trim();
+        }
+
+        async function handleSend() {
+            const message = userInput.value.trim();
+            if (!message) return;
+
+            addMessage(message, true);
+            userInput.value = '';
+            sendBtn.disabled = true;
+
+            addMessage('Pensando...', false);
+            const loadingMsg = chatContainer.lastChild;
+
+            try {
+                const response = await queryHuggingFace(message);
+                loadingMsg.remove();
+                addMessage(response, false);
+            } catch (error) {
+                loadingMsg.remove();
+                addMessage(`Error: ${error.message}. Verifica tu token de Hugging Face.`, false);
+            }
+
+            sendBtn.disabled = false;
+            userInput.focus();
+        }
+
+        sendBtn.addEventListener('click', handleSend);
+        userInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleSend();
+        });
+
+        // Mensaje de bienvenida
+        addMessage('¡Hola! Soy tu tutor socrático. Hazme una pregunta y te guiaré a encontrar la respuesta.', false);
+    </script>
+</body>
+</html>
