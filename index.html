@@ -1,237 +1,72 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tutor Socrático IA</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 20px auto;
-            padding: 20px;
-            background-color: #f5f5f5;
-        }
-        #setup-container {
-            background: white;
-            border-radius: 8px;
-            padding: 30px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            text-align: center;
-        }
-        #chat-container {
-            background: white;
-            border-radius: 8px;
-            padding: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            height: 400px;
-            overflow-y: auto;
-            margin-bottom: 20px;
-            display: none;
-        }
-        .message {
-            margin: 10px 0;
-            padding: 10px;
-            border-radius: 6px;
-        }
-        .user-message {
-            background-color: #007bff;
-            color: white;
-            text-align: right;
-        }
-        .bot-message {
-            background-color: #e9ecef;
-            color: #333;
-        }
-        #input-container {
-            display: none;
-            gap: 10px;
-        }
-        #user-input, #token-input {
-            flex: 1;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 14px;
-            width: 100%;
-            box-sizing: border-box;
-        }
-        button {
-            padding: 10px 20px;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-        }
-        button:hover {
-            background-color: #0056b3;
-        }
-        button:disabled {
-            background-color: #ccc;
-            cursor: not-allowed;
-        }
-        .loading {
-            color: #666;
-            font-style: italic;
-        }
-        .info-box {
-            background-color: #e7f3ff;
-            padding: 15px;
-            border-radius: 6px;
-            margin: 15px 0;
-            text-align: left;
-        }
-        .info-box a {
-            color: #007bff;
-        }
-        #reset-token {
-            background-color: #6c757d;
-            margin-top: 10px;
-            font-size: 12px;
-        }
-    </style>
-</head>
-<body>
-    <h2>🎓 Tutor Socrático IA</h2>
+import gradio as gr
+import requests
+import os
+
+API_URL = "https://api-inference.huggingface.co/models/mistralai/Mixtral-8x7B-Instruct-v0.1"
+API_TOKEN = os.environ.get("HF_TOKEN")
+
+def chat(mensaje, historial):
+    # Construir contexto
+    contexto = ""
+    for h in historial:
+        contexto += f"Estudiante: {h[0]}\nTutor: {h[1]}\n"
     
-    <div id="setup-container">
-        <h3>Configuración inicial</h3>
-        <div class="info-box">
-            <p><strong>Para usar este tutor necesitas un token gratuito de Hugging Face:</strong></p>
-            <ol style="text-align: left;">
-                <li>Ve a <a href="https://huggingface.co/settings/tokens" target="_blank">huggingface.co/settings/tokens</a></li>
-                <li>Crea un token de tipo "Read"</li>
-                <li>Copia el token (empieza con hf_...)</li>
-                <li>Pégalo abajo</li>
-            </ol>
-        </div>
-        <input type="password" id="token-input" placeholder="Pega tu token de Hugging Face aquí (hf_...)">
-        <button id="save-token-btn">Guardar y comenzar</button>
-        <p style="font-size: 12px; color: #666; margin-top: 10px;">Tu token se guarda localmente en tu navegador, no se envía a ningún servidor.</p>
-    </div>
+    prompt = f"""Eres un tutor socrático. Responde con preguntas reflexivas en español. Máximo 3 oraciones.
+{contexto}
+Estudiante: {mensaje}
+Tutor:"""
 
-    <div id="chat-container"></div>
-    <div id="input-container">
-        <input type="text" id="user-input" placeholder="Escribe tu pregunta aquí..." />
-        <button id="send-btn">Enviar</button>
-    </div>
-    <div style="text-align: center;">
-        <button id="reset-token" style="display: none;">Cambiar token</button>
-    </div>
-
-    <script>
-        const API_URL = 'https://api-inference.huggingface.co/models/mistralai/Mixtral-8x7B-Instruct-v0.1';
+    headers = {
+        "Authorization": f"Bearer {API_TOKEN}",
+        "Content-Type": "application/json"
+    }
+    
+    payload = {
+        "inputs": prompt,
+        "parameters": {
+            "max_new_tokens": 120,
+            "temperature": 0.7,
+            "return_full_text": False
+        }
+    }
+    
+    try:
+        response = requests.post(API_URL, headers=headers, json=payload, timeout=30)
         
-        const setupContainer = document.getElementById('setup-container');
-        const chatContainer = document.getElementById('chat-container');
-        const inputContainer = document.getElementById('input-container');
-        const userInput = document.getElementById('user-input');
-        const sendBtn = document.getElementById('send-btn');
-        const tokenInput = document.getElementById('token-input');
-        const saveTokenBtn = document.getElementById('save-token-btn');
-        const resetTokenBtn = document.getElementById('reset-token');
+        # Debug: imprimir status
+        print(f"Status: {response.status_code}")
+        print(f"Response: {response.text[:200]}")
+        
+        if response.status_code == 503:
+            return "El modelo está cargando. Espera 20 segundos e intenta de nuevo."
+        
+        response.raise_for_status()
+        data = response.json()
+        
+        # Manejar diferentes formatos de respuesta
+        if isinstance(data, list) and len(data) > 0:
+            if "generated_text" in data[0]:
+                return data[0]["generated_text"].strip()
+            elif isinstance(data[0], str):
+                return data[0].strip()
+        
+        return f"Respuesta inesperada: {str(data)[:100]}"
+        
+    except requests.exceptions.Timeout:
+        return "Tiempo de espera agotado. Intenta de nuevo."
+    except requests.exceptions.RequestException as e:
+        return f"Error de red: {str(e)[:100]}"
+    except Exception as e:
+        return f"Error: {str(e)[:100]}"
 
-        let API_TOKEN = localStorage.getItem('hf_token');
+demo = gr.ChatInterface(
+    fn=chat,
+    title="🎓 Tutor Socrático IA",
+    description="Haz preguntas y el tutor te guiará mediante el método socrático.",
+    examples=["¿Qué es la fotosíntesis?", "¿Cómo funciona la gravedad?"],
+    retry_btn="🔄 Reintentar",
+    undo_btn="↩️ Deshacer",
+    clear_btn="🗑️ Limpiar"
+)
 
-        function initializeChat() {
-            if (API_TOKEN) {
-                setupContainer.style.display = 'none';
-                chatContainer.style.display = 'block';
-                inputContainer.style.display = 'flex';
-                resetTokenBtn.style.display = 'inline-block';
-                addMessage('¡Hola! Soy tu tutor socrático. Hazme una pregunta y te guiaré a encontrar la respuesta.', false);
-            }
-        }
-
-        saveTokenBtn.addEventListener('click', () => {
-            const token = tokenInput.value.trim();
-            if (token.startsWith('hf_') && token.length > 10) {
-                localStorage.setItem('hf_token', token);
-                API_TOKEN = token;
-                initializeChat();
-            } else {
-                alert('Token inválido. Debe comenzar con "hf_" y tener más de 10 caracteres.');
-            }
-        });
-
-        resetTokenBtn.addEventListener('click', () => {
-            if (confirm('¿Seguro que deseas cambiar el token? Se borrará el chat actual.')) {
-                localStorage.removeItem('hf_token');
-                location.reload();
-            }
-        });
-
-        function addMessage(text, isUser) {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
-            messageDiv.textContent = text;
-            chatContainer.appendChild(messageDiv);
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-        }
-
-        async function queryHuggingFace(userMessage) {
-            const prompt = `Eres un tutor socrático. Tu objetivo es guiar al estudiante a descubrir la respuesta por sí mismo mediante preguntas reflexivas, sin dar respuestas directas. 
-
-Estudiante: ${userMessage}
-Tutor:`;
-
-            const response = await fetch(API_URL, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${API_TOKEN}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    inputs: prompt,
-                    parameters: {
-                        max_new_tokens: 200,
-                        temperature: 0.7,
-                        return_full_text: false
-                    }
-                })
-            });
-
-            if (!response.ok) {
-                throw new Error(`Error HTTP: ${response.status}`);
-            }
-
-            const data = await response.json();
-            return data[0].generated_text.trim();
-        }
-
-        async function handleSend() {
-            const message = userInput.value.trim();
-            if (!message) return;
-
-            addMessage(message, true);
-            userInput.value = '';
-            sendBtn.disabled = true;
-
-            addMessage('Pensando...', false);
-            const loadingMsg = chatContainer.lastChild;
-
-            try {
-                const response = await queryHuggingFace(message);
-                loadingMsg.remove();
-                addMessage(response, false);
-            } catch (error) {
-                loadingMsg.remove();
-                addMessage(`Error: ${error.message}. Verifica tu token o intenta más tarde.`, false);
-            }
-
-            sendBtn.disabled = false;
-            userInput.focus();
-        }
-
-        sendBtn.addEventListener('click', handleSend);
-        userInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') handleSend();
-        });
-
-        // Inicializar si ya existe token guardado
-        initializeChat();
-    </script>
-</body>
-</html>
+demo.launch()
