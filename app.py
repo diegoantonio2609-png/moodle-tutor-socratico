@@ -21,8 +21,11 @@ Tu objetivo es guiar al estudiante para que descubra las respuestas por sí mism
 
 def format_prompt(message, history):
     prompt = f"<s>[INST] {SYSTEM_PROMPT} [/INST]</s>"
-    for user_msg, bot_msg in history:
-        prompt += f"<s>[INST] {user_msg} [/INST] {bot_msg} </s>"
+    for msg in history:
+        if msg['role'] == "user":
+            prompt += f"<s>[INST] {msg['content']} [/INST]"
+        elif msg['role'] == "assistant":
+            prompt += f" {msg['content']} </s>"
     prompt += f"<s>[INST] {message} [/INST]"
     return prompt
 
@@ -87,7 +90,7 @@ theme = gr.themes.Soft(
     font=[gr.themes.GoogleFont("Inter"), "ui-sans-serif", "system-ui", "sans-serif"]
 )
 
-with gr.Blocks(theme=theme, css=custom_css, title="Tutor Socrático IA") as demo:
+with gr.Blocks(title="Tutor Socrático IA") as demo:
     with gr.Column(elem_id="container"):
         gr.Markdown("# 🎓 Tutor Socrático IA", elem_classes="title")
         gr.Markdown(
@@ -102,13 +105,8 @@ with gr.Blocks(theme=theme, css=custom_css, title="Tutor Socrático IA") as demo
                 "Explícame la teoría de la relatividad",
                 "¿Qué es la ética?",
                 "Ayúdame a entender las derivadas"
-            ],
-            retry_btn="🔄 Reintentar",
-            undo_btn="↩️ Deshacer",
-            clear_btn="🗑️ Limpiar",
-            submit_btn="Enviar",
-            stop_btn="Detener",
+            ]
         )
 
 if __name__ == "__main__":
-    demo.launch()
+    demo.launch(theme=theme, css=custom_css)
