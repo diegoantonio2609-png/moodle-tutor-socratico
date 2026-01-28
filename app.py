@@ -1,7 +1,6 @@
 import gradio as gr
 from huggingface_hub import InferenceClient
 import os
-
 # --- Configuration ---
 MODEL_ID = "mistralai/Mixtral-8x7B-Instruct-v0.1"
 HF_TOKEN = os.environ.get("HF_TOKEN")
@@ -90,7 +89,7 @@ theme = gr.themes.Soft(
     font=[gr.themes.GoogleFont("Inter"), "ui-sans-serif", "system-ui", "sans-serif"]
 )
 
-with gr.Blocks(title="Tutor Socrático IA") as demo:
+with gr.Blocks(title="Tutor Socrático IA", theme=theme, css=custom_css) as demo:
     with gr.Column(elem_id="container"):
         gr.Markdown("# 🎓 Tutor Socrático IA", elem_classes="title")
         gr.Markdown(
@@ -100,6 +99,7 @@ with gr.Blocks(title="Tutor Socrático IA") as demo:
 
         chat_interface = gr.ChatInterface(
             fn=respond,
+            type="messages",
             examples=[
                 "¿Por qué el cielo es azul?",
                 "Explícame la teoría de la relatividad",
@@ -109,4 +109,4 @@ with gr.Blocks(title="Tutor Socrático IA") as demo:
         )
 
 if __name__ == "__main__":
-    demo.launch(theme=theme, css=custom_css)
+    demo.launch()
